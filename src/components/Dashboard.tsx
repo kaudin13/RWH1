@@ -12,7 +12,13 @@ import { LanguageSelector } from './LanguageSelector';
 import { CameraCapture } from './CameraCapture';
 import { useLanguage } from './LanguageProvider';
 import { Droplets, LogOut, MapPin, Home, Users, Calculator, Camera, Navigation } from 'lucide-react';
-import { getCurrentLocation, reverseGeocode, fetchRainfallData } from '../utils/api';
+import { getCurrentLocation, reverseGeocode, fetchRainfallData, getLocationDetails } from '../utils/api';
+
+interface LocationInfo {
+  name: string;
+  coordinates: { lat: number; lon: number };
+  address: string;
+}
 
 interface User {
   id: string;
@@ -45,6 +51,7 @@ export function Dashboard({ user, onSignOut, onAssessmentComplete, onNavigate }:
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [locationInfo, setLocationInfo] = useState<LocationInfo | null>(null);
   const [formData, setFormData] = useState<AssessmentData>({
     name: user?.name || '',
     phone: '',
@@ -81,9 +88,16 @@ export function Dashboard({ user, onSignOut, onAssessmentComplete, onNavigate }:
       const coords = await getCurrentLocation();
       handleInputChange('coordinates', coords);
       
-      // Get address from coordinates
-      const address = await reverseGeocode(coords.lat, coords.lon, API_KEY);
-      handleInputChange('location', address);
+      // Get detailed location information
+      const locationDetails = await getLocationDetails(coords.lat, coords.lon, API_KEY);
+      handleInputChange('location', locationDetails.fullAddress);
+      
+      // Set location info for display
+      setLocationInfo({
+        name: locationDetails.name,
+        coordinates: coords,
+        address: locationDetails.fullAddress
+      });
       
       // Fetch rainfall data for the location
       const rainfallData = await fetchRainfallData(coords.lat, coords.lon, API_KEY);
@@ -253,8 +267,10 @@ export function Dashboard({ user, onSignOut, onAssessmentComplete, onNavigate }:
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium text-green-800">Location Detected!</p>
-                      <p className="text-sm text-green-600">
-                        Lat: {formData.coordinates.lat.toFixed(4)}, Lon: {formData.coordinates.lon.toFixed(4)}
+                      <p className="text-sm text-green-600 font-medium">{locationInfo?.name}</p>
+                      <p className="text-xs text-green-600">{locationInfo?.address}</p>
+                      <p className="text-xs text-green-500">
+                        {formData.coordinates.lat.toFixed(6)}, {formData.coordinates.lon.toFixed(6)}
                       </p>
                       {formData.annualRainfall > 0 && (
                         <p className="text-sm text-green-600">
@@ -265,6 +281,35 @@ export function Dashboard({ user, onSignOut, onAssessmentComplete, onNavigate }:
                     <Badge className="bg-green-100 text-green-800">
                       Location Set
                     </Badge>
+                  </div>
+                </div>
+              )}
+              
+              {locationInfo && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h3 className="font-medium text-blue-800 mb-3">Location Map</h3>
+                  <div className="relative">
+                    <iframe
+                      src={`https://www.openstreetmap.org/export/embed.html?bbox=${locationInfo.coordinates.lon-0.01},${locationInfo.coordinates.lat-0.01},${locationInfo.coordinates.lon+0.01},${locationInfo.coordinates.lat+0.01}&layer=mapnik&marker=${locationInfo.coordinates.lat},${locationInfo.coordinates.lon}`}
+                      width="100%"
+                      height="200"
+                      style={{ border: 0 }}
+                      className="rounded-md"
+                      title="Location Map"
+                    />
+                    <div className="absolute top-2 left-2 bg-white bg-opacity-90 px-2 py-1 rounded text-xs">
+                      📍 {locationInfo.name}
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xs text-blue-600">
+                    <a 
+                      href={`https://www.openstreetmap.org/?mlat=${locationInfo.coordinates.lat}&mlon=${locationInfo.coordinates.lon}&zoom=15`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:underline"
+                    >
+                      View on OpenStreetMap →
+                    </a>
                   </div>
                 </div>
               )}

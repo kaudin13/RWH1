@@ -51,12 +51,56 @@ export async function reverseGeocode(lat: number, lon: number, apiKey: string) {
     
     if (data.length > 0) {
       const location = data[0];
-      return `${location.name}, ${location.state}, ${location.country}`;
+      // Create a more detailed address
+      const parts = [];
+      if (location.name) parts.push(location.name);
+      if (location.state) parts.push(location.state);
+      if (location.country) parts.push(location.country);
+      
+      return parts.join(', ');
     }
     return `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
   } catch (error) {
     console.error('Error with reverse geocoding:', error);
     return `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+  }
+}
+
+// Get detailed location information
+export async function getLocationDetails(lat: number, lon: number, apiKey: string) {
+  try {
+    const response = await fetch(
+      `https://api.openweathermap.org/geo/1.0/reverse?lat=${lat}&lon=${lon}&limit=1&appid=${apiKey}`
+    );
+    const data = await response.json();
+    
+    if (data.length > 0) {
+      const location = data[0];
+      return {
+        name: location.name || 'Unknown Location',
+        state: location.state || '',
+        country: location.country || '',
+        fullAddress: `${location.name || 'Unknown'}, ${location.state || ''}, ${location.country || ''}`.replace(/,\s*,/g, ',').replace(/^,\s*|,\s*$/g, ''),
+        coordinates: { lat, lon }
+      };
+    }
+    
+    return {
+      name: 'Unknown Location',
+      state: '',
+      country: '',
+      fullAddress: `${lat.toFixed(4)}, ${lon.toFixed(4)}`,
+      coordinates: { lat, lon }
+    };
+  } catch (error) {
+    console.error('Error getting location details:', error);
+    return {
+      name: 'Unknown Location',
+      state: '',
+      country: '',
+      fullAddress: `${lat.toFixed(4)}, ${lon.toFixed(4)}`,
+      coordinates: { lat, lon }
+    };
   }
 }
 
